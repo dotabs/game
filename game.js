@@ -1,312 +1,369 @@
 (() => {
-  "use strict";
-  const DIFFICULTIES = {
-    easy:   { label: "Easy (4x4)", rows: 4, cols: 4 },
-    medium: { label: "Medium (4x6)", rows: 4, cols: 6 },
-    hard:   { label: "Hard (6x6)", rows: 6, cols: 6 },
+  const SESSION_KEY = 'mg_game';
+  const TOTAL_KEY = 'mg_totalMoves';
+
+  const difficulties = {
+    easy: { label: 'Easy (4x4)', rows: 4, cols: 4 },
+    medium: { label: 'Medium (4x6)', rows: 4, cols: 6 },
+    hard: { label: 'Hard (6x6)', rows: 6, cols: 6 },
   };
 
-  const SYMBOLS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".split("");
-
-  const apply = (node, styles) => Object.assign(node.style, styles);
-
-  const el = (tag, props = {}, children = []) => {
-    const node = document.createElement(tag);
-    Object.entries(props).forEach(([k, v]) => {
-      if (k === "style") apply(node, v);
-      else if (k === "className") node.className = v;
-      else if (k === "text") node.textContent = v;
-      else node[k] = v;
-    });
-    children.forEach((c) => node.appendChild(typeof c === "string" ? document.createTextNode(c) : c));
-    return node;
+  const themes = {
+    classic: {
+      label: 'Classic',
+      vars: {
+        '--bg': '#f1f5f9',
+        '--panel': '#ffffff',
+        '--text': '#0f172a',
+        '--muted': '#64748b',
+        '--card-back': '#1e88e5',
+        '--card-front': '#ffffff',
+        '--card-front-text': '#0f172a',
+        '--card-matched': '#22c55e',
+        '--card-matched-text': '#ffffff',
+        '--accent': '#0f172a',
+      },
+    },
+    ocean: {
+      label: 'Ocean',
+      vars: {
+        '--bg': '#e0f2fe',
+        '--panel': '#ffffff',
+        '--text': '#0f172a',
+        '--muted': '#0369a1',
+        '--card-back': '#0284c7',
+        '--card-front': '#f0f9ff',
+        '--card-front-text': '#0b2a3a',
+        '--card-matched': '#06b6d4',
+        '--card-matched-text': '#062a33',
+        '--accent': '#075985',
+      },
+    },
   };
 
-  const pad2 = (n) => String(n).padStart(2, "0"); 
+  const symbols = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.split('');
+
+  const $ = (id) => document.getElementById(id);
+
+  const pad2 = (n) => String(n).padStart(2, '0');
   const fmtTime = (s) => `${pad2(Math.floor(s / 60))}:${pad2(s % 60)}`;
 
   const shuffle = (arr) => {
-    const a = [...arr]; 
+    const a = arr.slice();
     for (let i = a.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]]; 
+      [a[i], a[j]] = [a[j], a[i]];
     }
     return a;
   };
 
-  const buildDeck = (pairsNeeded) =>
-    shuffle(SYMBOLS.slice(0, pairsNeeded).flatMap((s) => [s, s])); 
+  const buildDeck = (count) => {
+    const pairs = Math.floor(count / 2);
+    const pick = symbols.slice(0, pairs);
+    return shuffle(pick.flatMap((s) => [s, s]));
+  };
 
-  const state = {
-    rows: 4,
-    cols: 4,
+  const getTotalMoves = () => parseInt(localStorage.getItem(TOTAL_KEY) || '0', 10);
+  const addTotalMove = () => {
+    localStorage.setItem(TOTAL_KEY, String(getTotalMoves() + 1));
+  };
+
+  const applyTheme = (key) => {
+    const t = themes[key] || themes.classic;
+    Object.entries(t.vars).forEach(([k, v]) => document.documentElement.style.setProperty(k, v));
+  };
+
+  const loadGame = () => {
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY);
+      if (!raw) return null;
+      const g = JSON.parse(raw);
+      if (!g || !Array.isArray(g.deck) || !Array.isArray(g.matched)) return null;
+      if (g.deck.length !== g.matched.length) return null;
+      if (typeof g.rows !== 'number' || typeof g.cols !== 'number') return null;
+      if (g.rows * g.cols !== g.deck.length) return null;
+      g.moves = Number.isFinite(g.moves) ? g.moves : 0;
+      g.seconds = Number.isFinite(g.seconds) ? g.seconds : 0;
+      g.timerStarted = !!g.timerStarted;
+      g.gameOver = !!g.gameOver;
+      g.difficultyKey = typeof g.difficultyKey === 'string' ? g.difficultyKey : 'easy';
+      g.styleKey = typeof g.styleKey === 'string' ? g.styleKey : 'classic';
+      return g;
+    } catch {
+      return null;
+    }
+  };
+
+  const saveGame = (g) => {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(g));
+  };
+
+  const createDefaultGame = (difficultyKey, styleKey) => {
+    const d = difficulties[difficultyKey] || difficulties.easy;
+    const count = d.rows * d.cols;
+    return {
+      difficultyKey,
+      styleKey,
+      rows: d.rows,
+      cols: d.cols,
+      deck: buildDeck(count),
+      matched: Array(count).fill(false),
+      moves: 0,
+      seconds: 0,
+      timerStarted: false,
+      gameOver: false,
+    };
+  };
+
+  const ui = {
+    board: null,
+    moves: null,
+    time: null,
+    msg: null,
+    total: null,
+    diff: null,
+    style: null,
+    btnNew: null,
+  };
+
+  const play = {
     first: null,
     second: null,
     lock: false,
-    moves: 0,
-    matchedPairs: 0,
-    totalPairs: 0,
-    seconds: 0,
     timerId: null,
-    timerStarted: false,
-    gameOver: false,
   };
 
-  const ui = {};
+  let game = null;
 
-  const COLORS = {
-    bg: "#f1f5f9",
-    panel: "#ffffff",
-    shadow: "0 12px 30px rgba(2,6,23,.12)",
-    text: "#0f172a",
-    muted: "#64748b",
-    blue: "#1e88e5",
-    green: "#4caf50",
-    border: "#cbd5e1",
+  const setCardClass = (btn, mode) => {
+    btn.classList.remove('down', 'up', 'matched');
+    btn.classList.add(mode);
   };
 
- 
-  const startTimerIfNeeded = () => {
-    if (state.timerStarted || state.gameOver) return;
-    state.timerStarted = true;
-    state.timerId = setInterval(() => {
-      state.seconds += 1;
-      ui.time.textContent = fmtTime(state.seconds);
-    }, 1000);
+  const reveal = (i) => {
+    const btn = ui.board.querySelector(`[data-i="${i}"]`);
+    if (!btn) return;
+    btn.textContent = game.deck[i];
+    setCardClass(btn, 'up');
+  };
+
+  const hide = (i) => {
+    const btn = ui.board.querySelector(`[data-i="${i}"]`);
+    if (!btn) return;
+    btn.textContent = game.deck[i];
+    setCardClass(btn, 'down');
+  };
+
+  const markMatched = (i) => {
+    const btn = ui.board.querySelector(`[data-i="${i}"]`);
+    if (!btn) return;
+    btn.textContent = game.deck[i];
+    btn.disabled = true;
+    setCardClass(btn, 'matched');
+  };
+
+  const syncStats = () => {
+    ui.moves.textContent = String(game.moves);
+    ui.time.textContent = fmtTime(game.seconds);
+    ui.total.textContent = String(getTotalMoves());
   };
 
   const stopTimer = () => {
-    if (state.timerId) clearInterval(state.timerId);
-    state.timerId = null;
-    state.timerStarted = false;
+    if (play.timerId) clearInterval(play.timerId);
+    play.timerId = null;
   };
 
-
-  const setCardFace = (card, { up, matched }) => {
-    const show = up || matched;
-
-    card.dataset.face = matched ? "matched" : up ? "up" : "down";
-    card.disabled = !!matched;
-
-    apply(card, {
-      width: "56px",
-      height: "56px",
-      borderRadius: "6px",
-      border: "none",
-      cursor: matched ? "default" : "pointer",
-      fontWeight: "900",
-      fontSize: "22px",
-      background: matched ? COLORS.green : up ? COLORS.green : COLORS.blue,
-      color: show ? (matched ? "#fff" : COLORS.text) : "transparent",
-      userSelect: "none",
-    });
-  };
-
-
-  const setMessage = (text) => (ui.msg.textContent = text);
-  const updateMoves = () => (ui.moves.textContent = String(state.moves));
-
-  const resetTurn = () => {
-    state.first = null;
-    state.second = null;
-    state.lock = false;
+  const startTimer = () => {
+    if (game.timerStarted || game.gameOver) return;
+    game.timerStarted = true;
+    saveGame(game);
+    stopTimer();
+    play.timerId = setInterval(() => {
+      game.seconds += 1;
+      ui.time.textContent = fmtTime(game.seconds);
+      saveGame(game);
+    }, 1000);
   };
 
   const checkWin = () => {
-    if (state.matchedPairs !== state.totalPairs) return;
-    state.gameOver = true;
-    stopTimer();
-    setMessage(`Game Over! Moves: ${state.moves} • Time: ${fmtTime(state.seconds)}`);
+    if (game.matched.every(Boolean)) {
+      game.gameOver = true;
+      saveGame(game);
+      stopTimer();
+      ui.msg.textContent = 'You matched them all!';
+      ui.board.querySelectorAll('button.card').forEach((b) => (b.disabled = true));
+    }
   };
 
-  const handleMatch = () => {
-    setCardFace(state.first, { up: true, matched: true });
-    setCardFace(state.second, { up: true, matched: true });
-    state.matchedPairs += 1;
-    setMessage("Match!");
-    resetTurn();
-    checkWin();
+  const finishTurn = (match) => {
+    const a = play.first;
+    const b = play.second;
+    if (a == null || b == null) return;
+
+    if (match) {
+      game.matched[a] = true;
+      game.matched[b] = true;
+      markMatched(a);
+      markMatched(b);
+      saveGame(game);
+      ui.msg.textContent = 'Nice match.';
+      checkWin();
+    } else {
+      hide(a);
+      hide(b);
+      ui.msg.textContent = '';
+    }
+
+    play.first = null;
+    play.second = null;
+    play.lock = false;
   };
 
-  const handleMiss = () => {
-    setMessage("Not a match…");
-    setTimeout(() => {
-      setCardFace(state.first, { up: false, matched: false });
-      setCardFace(state.second, { up: false, matched: false });
-      setMessage("Try again.");
-      resetTurn();
-    }, 650);
-  };
+  const onCardClick = (i) => {
+    if (play.lock || game.gameOver) return;
+    if (game.matched[i]) return;
+    if (play.first === i) return;
 
-  const onGridClick = (e) => {
-    const card = e.target.closest("button[data-symbol]");
-    if (!card) return;
-    if (state.gameOver || state.lock) return;
-    if (card.disabled) return;
-    if (card === state.first) return;
+    startTimer();
 
-    startTimerIfNeeded();
-    setCardFace(card, { up: true, matched: false });
+    reveal(i);
 
-    if (!state.first) {
-      state.first = card;
-      setMessage("Pick another card.");
+    if (play.first == null) {
+      play.first = i;
       return;
     }
 
-    state.second = card;
-    state.lock = true;
+    play.second = i;
+    play.lock = true;
 
-    state.moves += 1;
-    updateMoves();
+    game.moves += 1;
+    saveGame(game);
+    syncStats();
 
-    const isMatch = state.first.dataset.symbol === state.second.dataset.symbol;
-    isMatch ? handleMatch() : handleMiss();
+    addTotalMove();
+    ui.total.textContent = String(getTotalMoves());
+
+    const match = game.deck[play.first] === game.deck[play.second];
+
+    setTimeout(() => finishTurn(match), match ? 200 : 650);
   };
 
-  const renderGrid = (deck) => {
-    ui.grid.replaceChildren(); 
+  const buildBoard = () => {
+    ui.board.innerHTML = '';
+    ui.board.style.gridTemplateColumns = `repeat(${game.cols}, 60px)`;
 
-    apply(ui.grid, {
-      display: "grid",
-      gap: "10px",
-      justifyContent: "center",
-      gridTemplateColumns: `repeat(${state.cols}, 56px)`, 
-      padding: "6px 0",
-    });
+    for (let i = 0; i < game.deck.length; i++) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'card';
+      btn.dataset.i = String(i);
+      btn.textContent = game.deck[i];
+      btn.addEventListener('click', () => onCardClick(i));
+      ui.board.appendChild(btn);
 
-    deck.forEach((symbol) => {
-      const card = el("button", { type: "button" }, []);
-      card.dataset.symbol = symbol;
-      card.textContent = symbol; 
-      setCardFace(card, { up: false, matched: false });
-      ui.grid.appendChild(card); 
-    });
-  };
-
-  const newGame = () => {
-    stopTimer();
-
-    const d = DIFFICULTIES[ui.diff.value] ?? DIFFICULTIES.easy;
-    state.rows = d.rows;
-    state.cols = d.cols;
-
-    state.first = null;
-    state.second = null;
-    state.lock = false;
-    state.moves = 0;
-    state.matchedPairs = 0;
-    state.seconds = 0;
-    state.timerStarted = false;
-    state.gameOver = false;
-
-    state.totalPairs = (state.rows * state.cols) / 2;
-    if (state.totalPairs > SYMBOLS.length) {
-      throw new Error("Not enough symbols to build this deck.");
+      if (game.matched[i]) {
+        btn.disabled = true;
+        setCardClass(btn, 'matched');
+      } else {
+        setCardClass(btn, 'down');
+      }
     }
 
-    ui.time.textContent = "00:00";
-    updateMoves();
-    setMessage("Start flipping cards.");
-
-    const deck = buildDeck(state.totalPairs);
-    renderGrid(deck);
+    play.first = null;
+    play.second = null;
+    play.lock = false;
   };
 
-  const init = () => {
-    apply(document.body, {
-      margin: "0",
-      minHeight: "100vh",
-      display: "grid",
-      placeItems: "center",
-      background: COLORS.bg,
-      fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial",
-      color: COLORS.text,
-      padding: "24px",
-    });
-
-    const app = document.getElementById("app");
-
-    const panel = el("div", { className: "panel" });
-    apply(panel, {
-      width: "min(360px, 92vw)",
-      background: COLORS.panel,
-      borderRadius: "12px",
-      padding: "18px",
-      boxShadow: COLORS.shadow,
-    });
-
-    const title = el("div", { text: "Memory Game" });
-    apply(title, {
-      textAlign: "center",
-      fontSize: "28px",
-      fontWeight: "800",
-      margin: "4px 0 12px",
-    });
-
-    ui.diff = el("select");
-    Object.entries(DIFFICULTIES).forEach(([k, v]) => {
-      ui.diff.appendChild(el("option", { value: k, text: v.label }));
-    });
-    apply(ui.diff, {
-      padding: "10px 12px",
-      borderRadius: "8px",
-      border: `1px solid ${COLORS.border}`,
-      background: "#fff",
-      fontSize: "14px",
-    });
-
-    ui.newBtn = el("button", { type: "button", text: "New Game" });
-    apply(ui.newBtn, {
-      padding: "10px 12px",
-      borderRadius: "8px",
-      border: `1px solid ${COLORS.blue}`,
-      background: COLORS.blue,
-      color: "#fff",
-      fontWeight: "800",
-      cursor: "pointer",
-      fontSize: "14px",
-    });
-
-    const controls = el("div");
-    apply(controls, { display: "flex", gap: "10px", justifyContent: "center", alignItems: "center" });
-    controls.append(ui.diff, ui.newBtn);
-
-    const stats = el("div");
-    apply(stats, { display: "flex", justifyContent: "center", gap: "28px", margin: "10px 0 8px", fontWeight: "800" });
-
-    const movesBox = el("div");
-    const timeBox = el("div");
-
-    ui.moves = el("b", { text: "0" });
-    ui.time = el("b", { text: "00:00" });
-
-    const movesLabel = el("span", { text: "Moves: " });
-    const timeLabel = el("span", { text: "Time: " });
-    apply(movesLabel, { color: COLORS.muted, fontWeight: "700" });
-    apply(timeLabel, { color: COLORS.muted, fontWeight: "700" });
-
-    movesBox.append(movesLabel, ui.moves);
-    timeBox.append(timeLabel, ui.time);
-    stats.append(movesBox, timeBox);
-
-    ui.msg = el("div", { text: "Choose a difficulty and start flipping cards." });
-    apply(ui.msg, { textAlign: "center", color: COLORS.muted, fontSize: "13px", minHeight: "18px", margin: "6px 0 12px" });
-
-    ui.grid = el("div", { id: "grid" });
-
-    panel.append(title, controls, stats, ui.msg, ui.grid);
-
-
-    app.replaceChildren(panel); 
-
-
-    ui.grid.addEventListener("click", onGridClick); 
-    ui.newBtn.addEventListener("click", newGame);
-    ui.diff.addEventListener("change", newGame);
-
-    newGame();
+  const startNewGame = () => {
+    stopTimer();
+    const diffKey = ui.diff.value;
+    const styleKey = ui.style.value;
+    game = createDefaultGame(diffKey, styleKey);
+    applyTheme(styleKey);
+    ui.msg.textContent = '';
+    saveGame(game);
+    syncStats();
+    buildBoard();
   };
 
-  document.addEventListener("DOMContentLoaded", init);
+  const restore = () => {
+    const saved = loadGame();
+    const diffKey = saved?.difficultyKey || 'easy';
+    const styleKey = saved?.styleKey || 'classic';
+
+    ui.diff.value = difficulties[diffKey] ? diffKey : 'easy';
+    ui.style.value = themes[styleKey] ? styleKey : 'classic';
+
+    game = saved || createDefaultGame(ui.diff.value, ui.style.value);
+
+    applyTheme(game.styleKey);
+
+    saveGame(game);
+    syncStats();
+    buildBoard();
+
+    if (game.timerStarted && !game.gameOver) {
+      stopTimer();
+      play.timerId = setInterval(() => {
+        game.seconds += 1;
+        ui.time.textContent = fmtTime(game.seconds);
+        saveGame(game);
+      }, 1000);
+    }
+
+    if (game.gameOver) ui.msg.textContent = 'You matched them all!';
+  };
+
+  const wire = () => {
+    ui.board = $('board');
+    ui.moves = $('moves');
+    ui.time = $('time');
+    ui.msg = $('msg');
+    ui.total = $('totalMoves');
+    ui.diff = $('difficulty');
+    ui.style = $('style');
+    ui.btnNew = $('newGame');
+
+    Object.entries(difficulties).forEach(([k, d]) => {
+      const opt = document.createElement('option');
+      opt.value = k;
+      opt.textContent = d.label;
+      ui.diff.appendChild(opt);
+    });
+
+    Object.entries(themes).forEach(([k, t]) => {
+      const opt = document.createElement('option');
+      opt.value = k;
+      opt.textContent = t.label;
+      ui.style.appendChild(opt);
+    });
+
+    ui.btnNew.addEventListener('click', startNewGame);
+
+    ui.diff.addEventListener('change', () => {
+      startNewGame();
+    });
+
+    ui.style.addEventListener('change', () => {
+      const key = ui.style.value;
+      applyTheme(key);
+      if (game) {
+        game.styleKey = key;
+        saveGame(game);
+      }
+    });
+
+    window.addEventListener('storage', (e) => {
+      if (e.key === TOTAL_KEY) ui.total.textContent = String(getTotalMoves());
+    });
+
+    restore();
+    ui.total.textContent = String(getTotalMoves());
+
+    window.addEventListener('beforeunload', () => {
+      if (game) saveGame(game);
+    });
+  };
+
+  document.addEventListener('DOMContentLoaded', wire);
 })();
