@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Todo List</title>
+  <style>
+    :root{--bg:#0b1220;--card:#111a2e;--muted:#7f8aa3;--text:#e8eefc;--line:#1f2b46;--btn:#2a67ff;--danger:#ff3b3b}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(180deg,#070b14,#0b1220);color:var(--text)}
+    .wrap{max-width:980px;margin:0 auto;padding:28px 16px}
+    h1{margin:0 0 16px;font-size:34px;letter-spacing:.2px}
+    .card{background:rgba(17,26,46,.9);border:1px solid var(--line);border-radius:14px;padding:16px}
+    .grid{display:grid;gap:14px}
+    @media(min-width:900px){.grid{grid-template-columns:1fr 1.2fr}}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+    .muted{color:var(--muted)}
+    form{display:grid;gap:10px}
+    label{font-size:13px;color:var(--muted)}
+    input,textarea{width:100%;padding:10px 11px;border-radius:10px;border:1px solid var(--line);background:#0b1327;color:var(--text);outline:none}
+    textarea{min-height:80px;resize:vertical}
+    .btns{display:flex;gap:10px;flex-wrap:wrap}
+    button{border:0;border-radius:10px;padding:10px 12px;font-weight:600;color:white;cursor:pointer}
+    .btn{background:var(--btn)}
+    .ghost{background:#152242;border:1px solid var(--line)}
+    .danger{background:var(--danger)}
+    .hidden{display:none}
+    .tabs{display:flex;gap:10px;margin-bottom:12px}
+    .tab{background:#152242;border:1px solid var(--line);color:var(--text);padding:8px 10px;border-radius:10px;cursor:pointer}
+    .tab.active{background:#23335d;border-color:#2c4277}
+    .msg{margin-top:10px;padding:10px;border-radius:10px;border:1px solid var(--line);background:#0b1327}
+    .msg.error{border-color:#5a2130;background:#1c0e16}
+    .msg.ok{border-color:#1f5a3a;background:#0d1d16}
+    .todo{display:flex;gap:12px;align-items:flex-start;padding:12px;border:1px solid var(--line);border-radius:12px;background:#0b1327}
+    .todo + .todo{margin-top:10px}
+    .todo h3{margin:0;font-size:16px}
+    .todo p{margin:6px 0 0;color:var(--muted)}
+    .todo .right{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
+    .badge{font-size:12px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="row" style="margin-bottom:14px">
+      <h1>Todo List</h1>
+      <div id="userBar" class="muted hidden">
+        <span>Logged in as <strong id="who"></strong></span>
+        <button id="logoutBtn" class="ghost" type="button" style="margin-left:10px">Logout</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <section id="authCard" class="card">
+        <div class="tabs">
+          <button id="tabLogin" class="tab active" type="button">Login</button>
+          <button id="tabRegister" class="tab" type="button">Register</button>
+        </div>
+
+        <form id="loginForm">
+          <div>
+            <label for="loginUsername">Username</label>
+            <input id="loginUsername" autocomplete="username" required />
+          </div>
+          <div>
+            <label for="loginPassword">Password</label>
+            <input id="loginPassword" type="password" autocomplete="current-password" required />
+          </div>
+          <div class="btns">
+            <button class="btn" type="submit">Login</button>
+          </div>
+          <div id="loginMsg" class="msg hidden"></div>
+        </form>
+
+        <form id="registerForm" class="hidden">
+          <div>
+            <label for="regUsername">Username</label>
+            <input id="regUsername" autocomplete="username" required />
+          </div>
+          <div>
+            <label for="regEmail">Email</label>
+            <input id="regEmail" type="email" autocomplete="email" required />
+          </div>
+          <div>
+            <label for="regPassword">Password</label>
+            <input id="regPassword" type="password" autocomplete="new-password" required />
+          </div>
+          <div class="btns">
+            <button class="btn" type="submit">Create account</button>
+          </div>
+          <div id="regMsg" class="msg hidden"></div>
+        </form>
+      </section>
+
+      <section id="appCard" class="card hidden">
+        <div class="row" style="margin-bottom:10px">
+          <div>
+            <div style="font-weight:700;font-size:18px">Your Todos</div>
+            <div class="badge" id="count"></div>
+          </div>
+        </div>
+
+        <form id="createForm">
+          <div>
+            <label for="title">Title</label>
+            <input id="title" required />
+          </div>
+          <div>
+            <label for="desc">Description</label>
+            <textarea id="desc"></textarea>
+          </div>
+          <div class="btns">
+            <button class="btn" type="submit">Add Todo</button>
+          </div>
+          <div id="createMsg" class="msg hidden"></div>
+        </form>
+
+        <div id="editPanel" class="hidden" style="margin-top:14px">
+          <div class="row" style="margin-bottom:8px">
+            <div style="font-weight:700">Edit Todo</div>
+            <button id="cancelEdit" class="ghost" type="button">Cancel</button>
+          </div>
+          <form id="editForm">
+            <div>
+              <label for="editTitle">Title</label>
+              <input id="editTitle" required />
+            </div>
+            <div>
+              <label for="editDesc">Description</label>
+              <textarea id="editDesc"></textarea>
+            </div>
+            <div class="row">
+              <label style="display:flex;gap:8px;align-items:center">
+                <input id="editDone" type="checkbox" />
+                Completed
+              </label>
+              <div class="btns">
+                <button class="btn" type="submit">Save</button>
+              </div>
+            </div>
+            <div id="editMsg" class="msg hidden"></div>
+          </form>
+        </div>
+
+        <div style="margin-top:14px" id="list"></div>
+      </section>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
