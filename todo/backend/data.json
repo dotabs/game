@@ -1,40 +1,12 @@
 {
   "users": [
     {
-      "userId": "b5021c47-847b-439f-b46c-f85ce94ab1f6",
-      "username": "user165791",
-      "email": "user165791@example.com",
-      "passwordHash": "$2a$10$2cYbLtsvlfiKQ4bDJinUq.V1kKlz8LnMyyW2ZKs6snB6j/E1OWyAa",
+      "userId": "444",
+      "username": "ter",
+      "email": "ter@test.com",
+      "passwordHash": "ter333",
       "createdAt": "2026-02-10T22:39:01.271Z"
     },
-    {
-      "userId": "b4415b35-44b5-4531-956f-69cd1ebd9790",
-      "username": "user860250",
-      "email": "user860250@example.com",
-      "passwordHash": "$2a$10$R5HUQB1LlgrpE8.VejzE2eBLF5rDdlcIZUZ2Coh1HAL5ks0Yy3.EC",
-      "createdAt": "2026-02-10T22:41:17.529Z"
-    },
-    {
-      "userId": "c4ce8608-93a1-4669-8fbe-48c4d3aff014",
-      "username": "user358163",
-      "email": "user358163@example.com",
-      "passwordHash": "$2a$10$VqP9L7JqzmwohWphNJ6PXu6LzgWyGw628be9Y.4k/ibrbAL40sKxS",
-      "createdAt": "2026-02-11T07:41:47.676Z"
-    },
-    {
-      "userId": "062ae5fd-4e47-49fb-a4ec-5066487e7ca9",
-      "username": "Abs",
-      "email": "simplezeenav@gmail.com",
-      "passwordHash": "$2a$10$6igH3q06so.wpjoCHByySOP36LETpfZBEGQvNXR6U9bpeZ8Z5.SmW",
-      "createdAt": "2026-02-11T07:49:38.478Z"
-    },
-    {
-      "userId": "87c34a95-c5f8-4f2e-b4cd-88a4f6a1c7d1",
-      "username": "Jee",
-      "email": "ee@gmail.com",
-      "passwordHash": "$2a$10$fEHm05Sqsg2b1OIaTFxIlunut0xTOR5deRC02kfavghaaDF3wVZDS",
-      "createdAt": "2026-02-11T07:54:08.005Z"
-    }
   ],
   "todos": []
 }
