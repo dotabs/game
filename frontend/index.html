@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Todo List</title>
+  <style>
+    :root{--bg:#f4f6fb;--surface:#ffffff;--text:#1f2937;--muted:#6b7280;--line:#d2d8e4;--primary:#2060f6;--primary-dark:#184cc4;--danger:#ce2f36;--danger-dark:#9e2328;--success:#1f7a49;--focus:#f7b955;--radius:12px;--shadow:0 12px 30px rgba(17,24,39,.08)}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:"Segoe UI",Tahoma,Geneva,Verdana,sans-serif;background:radial-gradient(circle at top,#ebf2ff,#f7f9fd 40%,#eef2f8);color:var(--text)}
+    .wrap{max-width:960px;margin:0 auto;padding:32px 16px 48px}
+    h1{margin:0;font-size:34px;line-height:1.1}
+    .grid{display:grid;gap:16px}
+    @media(min-width:940px){.grid{grid-template-columns:360px 1fr}}
+    .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+    .muted{color:var(--muted)}
+    form{display:grid;gap:10px}
+    label{display:block;font-weight:600;font-size:14px;margin-bottom:6px}
+    input,textarea{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--text)}
+    textarea{min-height:84px;resize:vertical}
+    input:focus-visible,textarea:focus-visible,button:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+    .btns{display:flex;gap:8px;flex-wrap:wrap}
+    button{border:1px solid transparent;border-radius:10px;padding:10px 12px;font-weight:700;cursor:pointer;transition:background-color .15s ease,opacity .15s ease}
+    button[disabled]{opacity:.65;cursor:not-allowed}
+    .btn{background:var(--primary);color:#fff}
+    .btn:hover:not([disabled]){background:var(--primary-dark)}
+    .ghost{background:#fff;color:var(--text);border-color:var(--line)}
+    .danger{background:var(--danger);color:#fff}
+    .danger:hover:not([disabled]){background:var(--danger-dark)}
+    .hidden{display:none}
+    .tabs{display:flex;gap:8px;margin-bottom:10px}
+    .tab{background:#fff;border:1px solid var(--line);color:var(--text);padding:8px 12px;border-radius:10px;cursor:pointer}
+    .tab.active{background:#edf3ff;border-color:#bdd0ff;color:#12347f}
+    .msg{margin-top:10px;padding:10px;border-radius:10px;border:1px solid transparent;font-weight:600}
+    .msg.error{border-color:#e3b2b8;background:#fff3f4;color:#7d2027}
+    .msg.ok{border-color:#9fd3b8;background:#eefaf3;color:#155434}
+    .field-error{display:block;min-height:18px;margin-top:4px;font-size:13px;color:#ad1f2f}
+    .field-error.hidden{display:none}
+    .todo{display:flex;gap:12px;align-items:flex-start;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fff}
+    .todo + .todo{margin-top:10px}
+    .todo h3{margin:0;font-size:17px}
+    .todo h3.done{text-decoration:line-through;color:var(--muted)}
+    .todo p{margin:6px 0 0;color:var(--muted)}
+    .todo .right{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+    .badge{font-size:13px;color:var(--muted)}
+    .loading{font-size:13px;color:var(--muted);font-weight:600}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="row" style="margin-bottom:14px">
+      <h1>Todo List</h1>
+      <div id="userBar" class="muted hidden">
+        <span>Logged in as <strong id="who"></strong></span>
+        <button id="logoutBtn" class="ghost" type="button" style="margin-left:10px">Logout</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <section id="authCard" class="card">
+        <div class="tabs">
+          <button id="tabLogin" class="tab active" type="button">Login</button>
+          <button id="tabRegister" class="tab" type="button">Register</button>
+        </div>
+
+        <form id="loginForm">
+          <div>
+            <label for="loginIdentifier">Username or Email</label>
+            <input id="loginIdentifier" autocomplete="username" required />
+            <small id="loginIdentifierErr" class="field-error hidden"></small>
+          </div>
+          <div>
+            <label for="loginPassword">Password</label>
+            <input id="loginPassword" type="password" autocomplete="current-password" required />
+            <small id="loginPasswordErr" class="field-error hidden"></small>
+          </div>
+          <div class="btns">
+            <button id="loginSubmit" class="btn" type="submit">Login</button>
+            <span id="loginLoading" class="loading hidden">Signing in...</span>
+          </div>
+          <div id="loginMsg" class="msg hidden"></div>
+        </form>
+
+        <form id="registerForm" class="hidden">
+          <div>
+            <label for="regUsername">Username</label>
+            <input id="regUsername" autocomplete="username" required />
+            <small id="regUsernameErr" class="field-error hidden"></small>
+          </div>
+          <div>
+            <label for="regEmail">Email</label>
+            <input id="regEmail" type="email" autocomplete="email" required />
+            <small id="regEmailErr" class="field-error hidden"></small>
+          </div>
+          <div>
+            <label for="regPassword">Password</label>
+            <input id="regPassword" type="password" autocomplete="new-password" required />
+            <small id="regPasswordErr" class="field-error hidden"></small>
+          </div>
+          <div class="btns">
+            <button id="registerSubmit" class="btn" type="submit">Create account</button>
+            <span id="registerLoading" class="loading hidden">Creating account...</span>
+          </div>
+          <div id="regMsg" class="msg hidden"></div>
+        </form>
+      </section>
+
+      <section id="appCard" class="card hidden">
+        <div class="row" style="margin-bottom:10px">
+          <div>
+            <div style="font-weight:700;font-size:18px">Your Todos</div>
+            <div class="badge" id="count"></div>
+          </div>
+        </div>
+
+        <form id="createForm">
+          <div>
+            <label for="title">Title</label>
+            <input id="title" required />
+            <small id="titleErr" class="field-error hidden"></small>
+          </div>
+          <div>
+            <label for="desc">Description</label>
+            <textarea id="desc"></textarea>
+          </div>
+          <div class="btns">
+            <button id="createSubmit" class="btn" type="submit">Add Todo</button>
+            <span id="createLoading" class="loading hidden">Saving...</span>
+          </div>
+          <div id="createMsg" class="msg hidden"></div>
+        </form>
+
+        <div id="editPanel" class="hidden" style="margin-top:14px">
+          <div class="row" style="margin-bottom:8px">
+            <div style="font-weight:700">Edit Todo</div>
+            <button id="cancelEdit" class="ghost" type="button">Cancel</button>
+          </div>
+          <form id="editForm">
+            <div>
+              <label for="editTitle">Title</label>
+              <input id="editTitle" required />
+              <small id="editTitleErr" class="field-error hidden"></small>
+            </div>
+            <div>
+              <label for="editDesc">Description</label>
+              <textarea id="editDesc"></textarea>
+            </div>
+            <div class="row">
+              <label style="display:flex;gap:8px;align-items:center">
+                <input id="editDone" type="checkbox" />
+                Completed
+              </label>
+              <div class="btns">
+                <button id="editSubmit" class="btn" type="submit">Save</button>
+                <span id="editLoading" class="loading hidden">Updating...</span>
+              </div>
+            </div>
+            <div id="editMsg" class="msg hidden"></div>
+          </form>
+        </div>
+
+        <div style="margin-top:14px" id="list"></div>
+      </section>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
